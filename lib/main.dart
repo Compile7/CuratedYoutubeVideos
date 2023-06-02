@@ -1,6 +1,8 @@
 import 'package:first_project/style_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import 'videos_data.dart';
 import 'video.dart';
 import 'style_widgets.dart';
@@ -34,6 +36,8 @@ class Card extends StatelessWidget {
 
     screenWidth = MediaQuery.of(context).size.width;
     screenHeight = MediaQuery.of(context).size.width;
+
+   
 
     // Video preview image
     return new Column(
@@ -155,6 +159,23 @@ class Description extends StatelessWidget {
 }
 
 void main() {
+  var user;
+   GoogleSignIn _googleSignIn = GoogleSignIn(
+// pass scopes here
+      scopes: [
+        'email',
+        'https://www.googleapis.com/auth/contacts.readonly',
+      ],
+    );
+    Future<void> _handleSignIn() async {
+      try {
+      user = await _googleSignIn.signIn();
+      print(user);
+            } catch (error) {
+        print(error);
+      }
+    }
+    print(user);
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -163,23 +184,29 @@ void main() {
           title: new Image.asset('lib/images/logo.png', height: 20.0),
           backgroundColor: Colors.grey[50],
           elevation: 10.0,
-
+          //title:Text(user==null?'':user.displayName),
           // Add new icon
           actions: [
-            new IconButton(
-              icon: new Icon(Icons.camera_alt),
-              onPressed: () {},
-            ),
-            new IconButton(
-              icon: new Icon(Icons.search),
-              onPressed: () {},
-            ),
+            // new IconButton(
+            //   icon: new Icon(Icons.camera_alt),
+            //   onPressed: () {},
+            // ),
+            // new IconButton(
+            //   icon: new Icon(Icons.search),
+            //   onPressed: () {},
+            // ),
             new Row(children: [
-              new Container(
-                child: new Image.asset('lib/images/man.png',
-                    height: 25.0, width: 25.0),
-                margin: EdgeInsets.only(left: 15.0, right: 15.0),
-              ),
+               new IconButton(
+              icon: new Icon(Icons.face),
+              onPressed: () {
+                _handleSignIn();
+              },
+            ),
+              // new Container(
+              //   child: new Image.asset('lib/images/man.png',
+              //       height: 25.0, width: 25.0),
+              //   margin: EdgeInsets.only(left: 15.0, right: 15.0),
+              // ),
             ]), // User avatar
           ],
 
