@@ -302,7 +302,7 @@ void main() {
       'email',
       'https://www.googleapis.com/auth/youtube'
     ],
-    clientId: '622626307311-2vujec8emo1vp7acu2hcltr3jrk7q36b.apps.googleusercontent.com',
+    clientId: '',
   );
   Future<void> _handleSignIn() async {
     try {
