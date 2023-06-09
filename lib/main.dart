@@ -6,6 +6,142 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'videos_data.dart';
 import 'video.dart';
 import 'style_widgets.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+void fetchPlaylists(String accessToken) async {
+  final playlistsUrl = Uri.https(
+    'www.googleapis.com',
+    '/youtube/v3/playlists',
+    {
+      'part': 'snippet',
+      'mine': 'true',
+      // 'key': apiKey,
+      'maxResults': '10', // Number of playlists to retrieve
+    },
+  );
+
+  final response = await http.get(playlistsUrl, headers: {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+  });
+
+  if (response.statusCode == 200) {
+    final decodedResponse = json.decode(response.body);
+    final playlists = decodedResponse['items'];
+
+    for (var playlist in playlists) {
+      final playlistId = playlist['id'];
+      final playlistTitle = playlist['snippet']['title'];
+      final playlistDescription = playlist['snippet']['description'];
+
+      print('Playlist Title: $playlistTitle');
+      print('Playlist Description: $playlistDescription');
+      print('---');
+
+      await fetchPlaylistItems(playlistId, accessToken);
+    }
+  } else {
+    print('Error: ${response.statusCode}');
+  }
+}
+
+void fetchPlaylistItems(String playlistId, String accessToken) async {
+  final playlistItemsUrl = 'https://www.googleapis.com/youtube/v3/playlistItems/?part=id&part=snippet&part=contentDetails&part=status&maxResults=10&playlistId='+ playlistId;
+  final uri = Uri.parse(playlistItemsUrl);
+  final response = await http.get(uri, headers: {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+  });
+
+  if (response.statusCode == 200) {
+    final decodedResponse = json.decode(response.body);
+    final videos = decodedResponse['items'];
+
+    for (var video in videos) {
+      final videoId = video['contentDetails']['videoId'];
+      final videoTitle = video['snippet']['title'];
+      final authorAvatar = video['snippet']['thumbnails']['default']['url'];
+      final authorName = video['snippet']['channelTitle'];
+      final subscribersCount = await fetchSubscriberCount(authorName, accessToken);
+      final descriptionShort = video['snippet']['description'];
+      final descriptionFull = await fetchVideoDescription(videoId, accessToken);
+      // final likes = video['statistics']['likeCount'];
+      // final dislikes = video['statistics']['dislikeCount'];
+      // final comments = video['statistics']['commentCount'];
+      // final views = video['statistics']['viewCount'];
+
+      print('Video ID: $videoId');
+      print('Video Title: $videoTitle');
+      print('Author Avatar: $authorAvatar');
+      print('Author Name: $authorName');
+      print('Subscribers Count: $subscribersCount');
+      print('Description (Short): $descriptionShort');
+      print('Description (Full): $descriptionFull');
+      // print('Likes: $likes');
+      // print('Dislikes: $dislikes');
+      // print('Comments: $comments');
+      // print('Views: $views');
+      print('---');
+    }
+  } else {
+    print('Error: ${response.statusCode}');
+  }
+}
+
+Future<int> fetchSubscriberCount(String channelName, String accessToken) async {
+  final channelUrl = Uri.https(
+    'www.googleapis.com',
+    '/youtube/v3/channels',
+    {
+      'part': 'statistics',
+      'forUsername': channelName,
+      // 'key': apiKey,
+    },
+  );
+
+  final response = await http.get(channelUrl, headers: {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+  });
+
+  if (response.statusCode == 200) {
+    final decodedResponse = json.decode(response.body);
+    final subscriberCount = int.parse(decodedResponse['items'][0]['statistics']['subscriberCount']);
+
+    return subscriberCount;
+  } else {
+    print('Error: ${response.statusCode}');
+    return 0;
+  }
+}
+
+Future<String> fetchVideoDescription(String videoId, String accessToken) async {
+  final videoUrl = Uri.https(
+    'www.googleapis.com',
+    '/youtube/v3/videos',
+    {
+      'part': 'snippet',
+      'id': videoId,
+      // 'key': apiKey,
+    },
+  );
+
+  final response = await http.get(videoUrl, headers: {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+  });
+
+  if (response.statusCode == 200) {
+    final decodedResponse = json.decode(response.body);
+    final description = decodedResponse['items'][0]['snippet']['description'];
+
+    return description;
+  } else {
+    print('Error: ${response.statusCode}');
+    return '';
+  }
+}
 
 String videoPreview;
 String videoPreviewAuthor;
@@ -160,22 +296,27 @@ class Description extends StatelessWidget {
 
 void main() {
   var user;
-   GoogleSignIn _googleSignIn = GoogleSignIn(
-// pass scopes here
-      scopes: [
-        'email',
-        'https://www.googleapis.com/auth/contacts.readonly',
-      ],
-    );
-    Future<void> _handleSignIn() async {
-      try {
-      user = await _googleSignIn.signIn();
-      print(user);
-            } catch (error) {
-        print(error);
-      }
-    }
+  GoogleSignIn _googleSignIn = GoogleSignIn(
+    // Pass scopes here
+    scopes: [
+      'email',
+      'https://www.googleapis.com/auth/youtube'
+    ],
+    clientId: '622626307311-2vujec8emo1vp7acu2hcltr3jrk7q36b.apps.googleusercontent.com',
+  );
+  Future<void> _handleSignIn() async {
+    try {
+    user = await _googleSignIn.signIn();
+    final auth = await user.authentication;
+    final accessToken = auth.accessToken;
     print(user);
+    print(auth);
+    print(accessToken);
+    fetchPlaylists(accessToken);
+          } catch (error) {
+      print(error);
+    }
+  }
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
