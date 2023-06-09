@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_signin_button/flutter_signin_button.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 void main() => runApp(MyApp());
 
@@ -10,11 +10,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Youtube APP',
+      title: 'Google Sign-In & YouTube Playlist',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Youtube APP'),
+      home: MyHomePage(title: 'Google Sign-In & YouTube Playlist'),
     );
   }
 }
@@ -29,14 +29,18 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  GoogleSignIn _googleSignIn =
-      GoogleSignIn(scopes: ['email', 'https://www.googleapis.com/auth/youtube'],
-          clientId: "622626307311-2vujec8emo1vp7acu2hcltr3jrk7q36b.apps.googleusercontent.com");
+  GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'https://www.googleapis.com/auth/youtube'],
+    clientId:
+        "622626307311-2vujec8emo1vp7acu2hcltr3jrk7q36b.apps.googleusercontent.com",
+  );
   bool _isLoggedIn = false;
   late GoogleSignInAccount _user;
   List<dynamic> _playlists = [];
   List<dynamic> _videos = [];
   String _selectedPlaylistId = '';
+  bool _isPlayerVisible = false;
+  String _selectedVideoUrl = '';
 
   void _login() async {
     try {
@@ -61,6 +65,8 @@ class _MyHomePageState extends State<MyHomePage> {
         _playlists.clear();
         _videos.clear();
         _selectedPlaylistId = '';
+        _isPlayerVisible = false;
+        _selectedVideoUrl = '';
       });
     } catch (error) {
       print('Error logging out: $error');
@@ -113,14 +119,18 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Widget _buildLoginButton() {
-    return Center(
-      child: SignInButton(
-        Buttons.Google,
-        onPressed: _login,
-        text: 'Sign in with Google',
-      ),
-    );
+  void _playVideo(String videoUrl) {
+    setState(() {
+      _isPlayerVisible = true;
+      _selectedVideoUrl = videoUrl;
+    });
+  }
+
+  void _closePlayer() {
+    setState(() {
+      _isPlayerVisible = false;
+      _selectedVideoUrl = '';
+    });
   }
 
   @override
@@ -152,53 +162,103 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
         ],
       ),
-      body: _isLoggedIn
-          ? Row(
-              children: <Widget>[
-                Container(
-                  width: 200,
-                  child: ListView.builder(
-                    itemCount: _playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = _playlists[index];
-                      return ListTile(
-                        title: Text(playlist['snippet']['title']),
-                        onTap: () {
-                          final playlistId = playlist['id'];
-                          setState(() {
-                            _selectedPlaylistId = playlistId;
-                          });
-                          _fetchVideos(playlistId);
-                        },
-                      );
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
+      body: Row(
+        children: <Widget>[
+          AnimatedContainer(
+            duration: Duration(milliseconds: 500),
+            width: _isPlayerVisible ? 0 : 200,
+            child: ListView.builder(
+              itemCount: _playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = _playlists[index];
+                return ListTile(
+                  title: Text(playlist['snippet']['title']),
+                  onTap: () {
+                    final playlistId = playlist['id'];
+                    setState(() {
+                      _selectedPlaylistId = playlistId;
+                    });
+                    _fetchVideos(playlistId);
+                  },
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: _isPlayerVisible
+                ? Column(
+                    children: [
+                      Container(
+                        height: 300,
+                        child: YoutubePlayer(
+                          controller: YoutubePlayerController(
+                            initialVideoId: YoutubePlayer.convertUrlToId(
+                                    _selectedVideoUrl) ??
+                                '',
+                            flags: YoutubePlayerFlags(
+                              autoPlay: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _closePlayer,
+                        child: Text('Back'),
+                      ),
+                    ],
+                  )
+                : GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 1,
+                      childAspectRatio: 16 / 9,
+                    ),
                     itemCount: _videos.length,
                     itemBuilder: (context, index) {
                       final video = _videos[index];
                       final snippet = video['snippet'];
                       final title = snippet['title'];
-                      final thumbnail =
-                          snippet['thumbnails']['medium']['url'];
-                      return ListTile(
-                        leading: Image.network(thumbnail),
-                        title: Text(title),
+                      final thumbnail = snippet['thumbnails']['medium']['url'];
+                      final videoId = video['id'];
+                      final videoUrl =
+                          'https://www.youtube.com/watch?v=$videoId';
+
+                      return GestureDetector(
+                        onTap: () => _playVideo(videoUrl),
+                        child: Card(
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Image.network(
+                                  thumbnail,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Text(
+                                  title,
+                                  style: TextStyle(fontSize: 16),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     },
                   ),
-                ),
-              ],
-            )
-          : _buildLoginButton(),
+          ),
+        ],
+      ),
       floatingActionButton: _isLoggedIn
           ? FloatingActionButton(
               onPressed: _logout,
               child: Icon(Icons.logout),
             )
-          : null,
+          : FloatingActionButton(
+              onPressed: _login,
+              child: Icon(Icons.login),
+            ),
     );
   }
 }
