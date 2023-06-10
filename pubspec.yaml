@@ -27,6 +27,10 @@ dependencies:
   flutter_signin_button: ^2.0.0
   shared_preferences: ^2.1.2
   cached_network_image: ^3.2.3
+  video_player: ^2.6.1
+  youtube_player_flutter: ^8.1.2
+  flutter_youtube: ^2.0.0+1
+  flutter_inappwebview: ^5.7.2+3
 
 dev_dependencies:
   flutter_test:

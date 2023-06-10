@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 void main() {
   runApp(MyApp());
@@ -41,7 +42,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _youtubePlaylist = [];
   bool _isLoading = false;
   bool _showPlaylist = false;
-  List<String> _youtubeVideos = [];
+  List<Map<String, dynamic>> _youtubeVideos = [];
 
   @override
   void initState() {
@@ -150,45 +151,53 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchRelatedVideos(String playlistId) async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      final headers = await _googleSignIn.currentUser?.authHeaders;
-      if (headers == null) {
-        throw Exception('User is not authenticated.');
-      }
-      final response = await http.get(
-        Uri.parse(
-            'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=$playlistId'),
-        headers: {
-          'Authorization': '${headers["Authorization"]}',
-        },
-      );
+  setState(() {
+    _isLoading = true;
+  });
+  try {
+    final headers = await _googleSignIn.currentUser?.authHeaders;
+    if (headers == null) {
+      throw Exception('User is not authenticated.');
+    }
+    final response = await http.get(
+      Uri.parse(
+          'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=$playlistId'),
+      headers: {
+        'Authorization': '${headers["Authorization"]}',
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final items = data['items'] as List<dynamic>;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = data['items'] as List<dynamic>;
-
-        setState(() {
-          _youtubeVideos =
-              items.map<String>((item) => item['snippet']['title']).toList();
-          _isLoading = false;
-        });
-      } else {
-        print(
-            'Error fetching related videos. Status code: ${response.statusCode}');
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (error) {
-      print('Error fetching related videos: $error');
+      setState(() {
+        _youtubeVideos = items.map<Map<String, dynamic>>((item) {
+          final snippet = item['snippet'];
+          return {
+            'id': item['id'], // Add the video ID here
+            'thumbnailUrl': snippet['thumbnails']['high']['url'],
+            'title': snippet['title'],
+            'author': snippet['channelTitle'],
+            'channel': snippet['channelTitle'],
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } else {
+      print(
+          'Error fetching related videos. Status code: ${response.statusCode}');
       setState(() {
         _isLoading = false;
       });
     }
+  } catch (error) {
+    print('Error fetching related videos: $error');
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -247,35 +256,63 @@ class _HomePageState extends State<HomePage> {
           children: <Widget>[
             if (!_isLoggedIn)
               ElevatedButton(
+                child: Text('Sign In with Google'),
                 onPressed: _handleSignIn,
-                child: Text('Sign in with Google'),
-              )
-            else if (_isLoading)
+              ),
+            if (_isLoading)
               CircularProgressIndicator()
-            else if (_youtubeVideos.isNotEmpty)
+            else if (_isLoggedIn && _youtubeVideos.isEmpty)
+              Text('No videos found.')
+            else if (_isLoggedIn)
               Expanded(
-                child: GridView.count(
-                  crossAxisCount: MediaQuery.of(context).size.width < 600
-                      ? 1
-                      : MediaQuery.of(context).size.width < 1200
-                          ? 3
-                          : 4,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  padding: EdgeInsets.all(10),
-                  children: _youtubeVideos.map((videoTitle) {
-                    return GridTile(
-                      child: Container(
-                        color: Colors.grey[300],
-                        child: Center(
-                          child: Text(
-                            videoTitle,
-                            style: TextStyle(fontSize: 16),
+                child: ListView.builder(
+                  itemCount: _youtubeVideos.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final video = _youtubeVideos[index];
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => YoutubePlayer(
+                              controller: YoutubePlayerController(
+                                initialVideoId: video['id'],
+                                flags: YoutubePlayerFlags(
+                                  autoPlay: true,
+                                  mute: false,
+                                ),
+                              ),
+                              showVideoProgressIndicator: true,
+                              progressIndicatorColor: Colors.blueAccent,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Image.network(video['thumbnailUrl']),
+                              SizedBox(height: 8),
+                              Text(
+                                video['title'],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                video['author'],
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     );
-                  }).toList(),
+                  },
                 ),
               ),
           ],
@@ -286,13 +323,11 @@ class _HomePageState extends State<HomePage> {
 
   List<Widget> _buildPlaylistItems() {
     return _youtubePlaylist
-            .map((playlistData) => ListTile(
-                  title:  Text(playlistData['title']),
-                  enabled: !_isLoading,
-                  onTap: () {
-                    _fetchRelatedVideos(playlistData['id']);
-                  },
-                ))
-            .toList();
+        .map((item) => ListTile(
+              title: Text(item['title']),
+              leading: Icon(Icons.video_library),
+              onTap: () => _fetchRelatedVideos(item['id']),
+            ))
+        .toList();
   }
 }
