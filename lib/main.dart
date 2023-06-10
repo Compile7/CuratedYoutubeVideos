@@ -43,13 +43,16 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = false;
   bool _showPlaylist = false;
   List<Map<String, dynamic>> _youtubeVideos = [];
-    bool _isVideoPlaying = false;
+  bool _isVideoPlaying = false;
+  bool _isLargeScreen = false;
+late YoutubePlayerController _ytbPlayerController; 
 
   @override
   void initState() {
-    super.initState();
+  super.initState();
     _checkIfLoggedIn();
-  }
+
+}
 
   Future<void> _checkIfLoggedIn() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -130,9 +133,9 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _youtubePlaylist = items
               .map<Map<String, dynamic>>((item) => {
-            'title': item['snippet']['title'],
-            'id': item['id'],
-          })
+                    'title': item['snippet']['title'],
+                    'id': item['id'],
+                  })
               .toList();
           _isLoading = false;
         });
@@ -203,52 +206,88 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Google Login Demo'),
+        title: Text('My Youtube Playlist App'),
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    backgroundImage: NetworkImage(_currentUser?.photoUrl ?? ''),
-                    radius: 30,
+      drawer: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          _isLargeScreen = constraints.maxWidth > 600;
+          return Drawer(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    _currentUser?.displayName ?? '',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                            CircleAvatar(
+                              backgroundImage:
+                                  NetworkImage(_currentUser?.photoUrl ?? ''),
+                              radius: 30,
+                            ), // Replace icon_name with the desired icon
+                          ]),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                _currentUser?.displayName ?? '',
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                _currentUser?.email ?? '',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.arrow_back),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                 color: Colors.white,
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ],
                   ),
-                  Text(
-                    _currentUser?.email ?? '',
-                    style: TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ],
-              ),
+                ),
+                if (_showPlaylist || _isLargeScreen) ..._buildPlaylistItems(),
+                ListTile(
+                  title: Text('Sign Out'),
+                  leading: Icon(Icons.logout),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleSignOut();
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              title: Text('Playlist'),
-              leading: Icon(Icons.playlist_play),
-              onTap: () {
-                setState(() {
-                  _showPlaylist = !_showPlaylist;
-                });
-              },
-            ),
-            if (_showPlaylist) ..._buildPlaylistItems(),
-            ListTile(
-              title: Text('Sign Out'),
-              leading: Icon(Icons.logout),
-              onTap: _handleSignOut,
-            ),
-          ],
-        ),
+          );
+        },
       ),
       body: Center(
         child: Column(
@@ -262,16 +301,19 @@ class _HomePageState extends State<HomePage> {
             if (_isLoading)
               CircularProgressIndicator()
             else if (_isLoggedIn && _youtubeVideos.isEmpty)
-              Text('Please click on any playlist to show videos. or video not found')
+              Text(
+                  'Please click on any playlist to show videos. or video not found')
             else if (_isLoggedIn)
               Expanded(
                 child: GridView.builder(
-                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: MediaQuery.of(context).size.width ~/ 200, // Adjust the width as per your requirement
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.8, // Adjust the aspect ratio as per your requirement
-                ),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: (_isLargeScreen)
+                        ? (MediaQuery.of(context).size.width ~/ 200) ~/ 2
+                        : MediaQuery.of(context).size.width ~/ 200,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.8,
+                  ),
                   itemCount: _youtubeVideos.length,
                   itemBuilder: (BuildContext context, int index) {
                     final video = _youtubeVideos[index];
@@ -349,10 +391,13 @@ class _HomePageState extends State<HomePage> {
   List<Widget> _buildPlaylistItems() {
     return _youtubePlaylist
         .map((item) => ListTile(
-      title: Text(item['title']),
-      leading: Icon(Icons.video_library),
-      onTap: () => _fetchRelatedVideos(item['id']),
-    ))
+              title: Text(item['title']),
+              leading: Icon(Icons.video_library),
+              onTap: () {
+                Navigator.pop(context);
+                _fetchRelatedVideos(item['id']);
+              },
+            ))
         .toList();
   }
 }
