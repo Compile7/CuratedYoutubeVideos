@@ -174,7 +174,7 @@ class _HomePageState extends State<HomePage> {
         _youtubeVideos = items.map<Map<String, dynamic>>((item) {
           final snippet = item['snippet'];
           return {
-            'id': item['id'], // Add the video ID here
+            'id': item['snippet']['resourceId']['videoId'],
             'thumbnailUrl': snippet['thumbnails']['high']['url'],
             'title': snippet['title'],
             'author': snippet['channelTitle'],
