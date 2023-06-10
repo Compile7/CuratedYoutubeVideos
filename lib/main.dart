@@ -43,6 +43,7 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = false;
   bool _showPlaylist = false;
   List<Map<String, dynamic>> _youtubeVideos = [];
+    bool _isVideoPlaying = false;
 
   @override
   void initState() {
@@ -129,9 +130,9 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _youtubePlaylist = items
               .map<Map<String, dynamic>>((item) => {
-                    'title': item['snippet']['title'],
-                    'id': item['id'],
-                  })
+            'title': item['snippet']['title'],
+            'id': item['id'],
+          })
               .toList();
           _isLoading = false;
         });
@@ -151,53 +152,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchRelatedVideos(String playlistId) async {
-  setState(() {
-    _isLoading = true;
-  });
-  try {
-    final headers = await _googleSignIn.currentUser?.authHeaders;
-    if (headers == null) {
-      throw Exception('User is not authenticated.');
-    }
-    final response = await http.get(
-      Uri.parse(
-          'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=$playlistId'),
-      headers: {
-        'Authorization': '${headers["Authorization"]}',
-      },
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final items = data['items'] as List<dynamic>;
-
-      setState(() {
-        _youtubeVideos = items.map<Map<String, dynamic>>((item) {
-          final snippet = item['snippet'];
-          return {
-            'id': item['snippet']['resourceId']['videoId'],
-            'thumbnailUrl': snippet['thumbnails']['high']['url'],
-            'title': snippet['title'],
-            'author': snippet['channelTitle'],
-            'channel': snippet['channelTitle'],
-          };
-        }).toList();
-        _isLoading = false;
-      });
-    } else {
-      print(
-          'Error fetching related videos. Status code: ${response.statusCode}');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  } catch (error) {
-    print('Error fetching related videos: $error');
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
-  }
-}
+    try {
+      final headers = await _googleSignIn.currentUser?.authHeaders;
+      if (headers == null) {
+        throw Exception('User is not authenticated.');
+      }
+      final response = await http.get(
+        Uri.parse(
+            'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=$playlistId'),
+        headers: {
+          'Authorization': '${headers["Authorization"]}',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['items'] as List<dynamic>;
 
+        setState(() {
+          _youtubeVideos = items.map<Map<String, dynamic>>((item) {
+            final snippet = item['snippet'];
+            return {
+              'id': item['snippet']['resourceId']['videoId'],
+              'thumbnailUrl': snippet['thumbnails']['high']['url'],
+              'title': snippet['title'],
+              'author': snippet['channelTitle'],
+              'channel': snippet['channelTitle'],
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        print(
+            'Error fetching related videos. Status code: ${response.statusCode}');
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (error) {
+      print('Error fetching related videos: $error');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -262,28 +262,53 @@ class _HomePageState extends State<HomePage> {
             if (_isLoading)
               CircularProgressIndicator()
             else if (_isLoggedIn && _youtubeVideos.isEmpty)
-              Text('No videos found.')
+              Text('Please click on any playlist to show videos. or video not found')
             else if (_isLoggedIn)
               Expanded(
-                child: ListView.builder(
+                child: GridView.builder(
+                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: MediaQuery.of(context).size.width ~/ 200, // Adjust the width as per your requirement
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.8, // Adjust the aspect ratio as per your requirement
+                ),
                   itemCount: _youtubeVideos.length,
                   itemBuilder: (BuildContext context, int index) {
                     final video = _youtubeVideos[index];
                     return GestureDetector(
                       onTap: () {
+                        setState(() {
+                          _isVideoPlaying = true;
+                        });
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => YoutubePlayer(
-                              controller: YoutubePlayerController(
-                                initialVideoId: video['id'],
-                                flags: YoutubePlayerFlags(
-                                  autoPlay: true,
-                                  mute: false,
+                            builder: (context) => Scaffold(
+                              appBar: AppBar(
+                                leading: IconButton(
+                                  icon: Icon(Icons.arrow_back),
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
                                 ),
+                                title: Text(video['title']),
                               ),
-                              showVideoProgressIndicator: true,
-                              progressIndicatorColor: Colors.blueAccent,
+                              body: YoutubePlayer(
+                                controller: YoutubePlayerController(
+                                  initialVideoId: video['id'],
+                                  flags: YoutubePlayerFlags(
+                                    autoPlay: true,
+                                    mute: false,
+                                  ),
+                                ),
+                                showVideoProgressIndicator: true,
+                                progressIndicatorColor: Colors.blueAccent,
+                                onEnded: (metadata) {
+                                  setState(() {
+                                    _isVideoPlaying = false;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         );
@@ -324,10 +349,10 @@ class _HomePageState extends State<HomePage> {
   List<Widget> _buildPlaylistItems() {
     return _youtubePlaylist
         .map((item) => ListTile(
-              title: Text(item['title']),
-              leading: Icon(Icons.video_library),
-              onTap: () => _fetchRelatedVideos(item['id']),
-            ))
+      title: Text(item['title']),
+      leading: Icon(Icons.video_library),
+      onTap: () => _fetchRelatedVideos(item['id']),
+    ))
         .toList();
   }
 }
