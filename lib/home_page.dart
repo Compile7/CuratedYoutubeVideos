@@ -29,6 +29,8 @@ class _HomePageState extends State<HomePage> {
   bool _showPlaylist = false;
   List<Map<String, dynamic>> _youtubeVideos = [];
   bool _isLargeScreen = false;
+  bool _isVideoPlaying = false;
+
 
   @override
   void initState() {
