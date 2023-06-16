@@ -3,7 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 void main() {
   runApp(MyApp());
@@ -45,14 +45,12 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _youtubeVideos = [];
   bool _isVideoPlaying = false;
   bool _isLargeScreen = false;
-late YoutubePlayerController _ytbPlayerController; 
 
-  @override
+@override
   void initState() {
-  super.initState();
+    super.initState();
     _checkIfLoggedIn();
-
-}
+  }
 
   Future<void> _checkIfLoggedIn() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -173,12 +171,11 @@ late YoutubePlayerController _ytbPlayerController;
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final items = data['items'] as List<dynamic>;
-
         setState(() {
           _youtubeVideos = items.map<Map<String, dynamic>>((item) {
             final snippet = item['snippet'];
             return {
-              'id': item['snippet']['resourceId']['videoId'],
+              'id': snippet['resourceId']['videoId'],
               'thumbnailUrl': snippet['thumbnails']['high']['url'],
               'title': snippet['title'],
               'author': snippet['channelTitle'],
@@ -335,21 +332,17 @@ late YoutubePlayerController _ytbPlayerController;
                                 ),
                                 title: Text(video['title']),
                               ),
-                              body: YoutubePlayer(
+                              body: YoutubePlayerIFrame(
                                 controller: YoutubePlayerController(
-                                  initialVideoId: video['id'],
-                                  flags: YoutubePlayerFlags(
+                                  initialVideoId: video['id'], // Replace with your YouTube video ID
+                                  params: YoutubePlayerParams(
                                     autoPlay: true,
-                                    mute: false,
+                                    showControls: true,
+                                    showFullscreenButton: true,
                                   ),
-                                ),
-                                showVideoProgressIndicator: true,
-                                progressIndicatorColor: Colors.blueAccent,
-                                onEnded: (metadata) {
-                                  setState(() {
-                                    _isVideoPlaying = false;
-                                  });
-                                },
+                                ), // Replace with your controller
+                                aspectRatio: 16 / 9, // Set the aspect ratio of the player
+                                // autoPlay: true, // Set autoPlay to true if you want the video to start playing automatically
                               ),
                             ),
                           ),
