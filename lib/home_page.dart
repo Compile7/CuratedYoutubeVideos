@@ -28,7 +28,6 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = false;
   bool _showPlaylist = false;
   List<Map<String, dynamic>> _youtubeVideos = [];
-  bool _isVideoPlaying = false;
   bool _isLargeScreen = false;
 
   @override
@@ -188,7 +187,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('My Youtube Playlist App'),
+        title: Text('Curated Youtube Video App'),
       ),
       drawer: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
